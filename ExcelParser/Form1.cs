@@ -22,6 +22,7 @@ namespace ExcelParser
         Thread pars_thread = null;
         System.Windows.Forms.Timer timer = null;
         char[] separator_size = new char[5] { 'X', 'x', '*', 'Х', 'х' };
+        String fileName;
 
         public Form1()
         {
@@ -277,34 +278,93 @@ namespace ExcelParser
                             }
                             catch (Exception)
                             {
-                                /*
-                                1 - ФАНЕРА КЛЕЕНАЯ, СОСТОЯЩАЯ ИСКЛЮЧИТЕЛЬНО ИЗ БЕРЕЗОВОГО ШПОНА МАРКИ ФК, ГОСТ 3916.1 - 96, РАЗМЕР 1525Х1525ММ, 
-                                НЕШЛИФОВАННАЯ,СОРТ 4 / 4, КЛАС ЭМИССИИ Е - 1, КРОМКИ И ТОРЦЫ НЕ ИМЕЮТ ПАЗОВ И ГРЕБНЕЙ,: ТОЛЩИНА - 9ММ, 
-                                17ПАКЕТОВ - 17,08КУБ.М, КОЛИЧЕСТВО СЛОЕВ-7, ТОЛЩИНА - 15 ММ, 16 ПАКЕТОВ - 15,94 КУБ.М, КОЛИЧЕСТВО СЛОЕВ-11, 
-                                ТОЛЩИНА КАЖДОГО СЛОЯ 1,33ММ, СПЕЦИФИКАЦИЯ № 10, ЦЕНА 9ММ - 214ЕВРО,ЦЕНА 15 ММ - 207ЕВРО, ДЛЯ СТРОИТЕЛЬНЫХ РАБОТ: 
-                                Изготовитель: ПК МАКСАТИХИНСКИЙ ЛЕСОПРОМЫШЛЕННЫЙ КОМБИНАТ; Тов.знак: ОТСУТСТВУЕТ;
-                                */
-                                dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
-                                dst.Cells[dst_row, 9].Value = get_value2(nonPars, "МАРКИ");
-                                int r = nonPars.IndexOf("РАЗМЕР");
-                                string a = get_numeric(nonPars, r);
-                                dst.Cells[dst_row, 10].Value = a;
-                                r += a.Length;
-                                dst_row--;
-                                dst.Cells[dst_row, 11].Value = get_numeric(nonPars, r);
-                                bool bfirst = true;
-
-                                var temps = nonPars.Split(new string[] { "ТОЛЩИНА - " }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                                temps.RemoveAt(0);
-                                foreach (var tmp in temps)
+                                try
                                 {
-                                    dst_row++;
+                                    /*
+                                    1 - ФАНЕРА КЛЕЕНАЯ, СОСТОЯЩАЯ ИСКЛЮЧИТЕЛЬНО ИЗ БЕРЕЗОВОГО ШПОНА МАРКИ ФК, ГОСТ 3916.1 - 96, РАЗМЕР 1525Х1525ММ, 
+                                    НЕШЛИФОВАННАЯ,СОРТ 4 / 4, КЛАС ЭМИССИИ Е - 1, КРОМКИ И ТОРЦЫ НЕ ИМЕЮТ ПАЗОВ И ГРЕБНЕЙ,: ТОЛЩИНА - 9ММ, 
+                                    17ПАКЕТОВ - 17,08КУБ.М, КОЛИЧЕСТВО СЛОЕВ-7, ТОЛЩИНА - 15 ММ, 16 ПАКЕТОВ - 15,94 КУБ.М, КОЛИЧЕСТВО СЛОЕВ-11, 
+                                    ТОЛЩИНА КАЖДОГО СЛОЯ 1,33ММ, СПЕЦИФИКАЦИЯ № 10, ЦЕНА 9ММ - 214ЕВРО,ЦЕНА 15 ММ - 207ЕВРО, ДЛЯ СТРОИТЕЛЬНЫХ РАБОТ: 
+                                    Изготовитель: ПК МАКСАТИХИНСКИЙ ЛЕСОПРОМЫШЛЕННЫЙ КОМБИНАТ; Тов.знак: ОТСУТСТВУЕТ;
+                                    */
+                                    dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
+                                    dst.Cells[dst_row, 9].Value = get_value2(nonPars, "МАРКИ");
+                                    int r = nonPars.IndexOf("РАЗМЕР");
+                                    string a = get_numeric(nonPars, r);
+                                    dst.Cells[dst_row, 10].Value = a;
+                                    r += a.Length;
+                                    dst_row--;
+                                    dst.Cells[dst_row, 11].Value = get_numeric(nonPars, r);
+                                    bool bfirst = true;
 
-                                    if (!bfirst)
-                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                    dst.Cells[dst_row, 12].Value = get_numeric(tmp, 0);
-                                    dst.Cells[dst_row, 13].Value = get_numeric(tmp, nonPars.IndexOf("ПАКЕТОВ"));
-                                    bfirst = false;
+                                    var temps = nonPars.Split(new string[] { "ТОЛЩИНА - " }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                                    temps.RemoveAt(0);
+                                    foreach (var tmp in temps)
+                                    {
+                                        dst_row++;
+
+                                        if (!bfirst)
+                                            dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                        dst.Cells[dst_row, 12].Value = get_numeric(tmp, 0);
+                                        dst.Cells[dst_row, 13].Value = get_numeric(tmp, nonPars.IndexOf("ПАКЕТОВ"));
+                                        bfirst = false;
+                                    }
+                                }
+                                catch (Exception)
+                                {
+                                    //!!!!! НЕПРАВИЛЬНО
+                                    /*
+                                     * ФАHЕРА КЛЕЕНАЯ БЕРЕЗОВАЯ (С ТОЛЩИНОЙ ШПОНА НЕ БОЛЕЕ 2,5ММ, НАРУЖН.СЛОИ ИЗ ЛИСТОВ БЕРЕЗ.ШПОНА) 
+                                     * ВВ 1250*2500
+                                     *  (
+                                     *      6,5ММ-2,966М3;
+                                     *      9ММ-6,076М3;
+                                     *      12ММ-15М3;
+                                     *      15ММ-27М3;
+                                     *      18ММ-12,152М3;
+                                     *      21ММ-13,581М3;
+                                     *      24ММ-3М3;
+                                     *      27ММ-3,038М3;
+                                     *      30ММ-6М3
+                                     *  ).: 
+                                     *  Изготовитель: ООО СЫКТЫВКАРСКИЙ ФАНЕРНЫЙ ЗАВОД; 
+                                     *  Тов.знак: SYPLY; 
+                                     *  Марка :ФСФ; 
+                                     *  Модель: ОТСУТСТВУЕТ; 
+                                     *  Артикул: ОТСУТСТВУЕТ; 
+                                     *  Стандарт: ТУ5512-001-44769167-11; 
+                                     *  Кол-во: 88,813 М3
+                                    */
+                                    dst.Cells[dst_row, 9].Value = get_value(nonPars, "Марка");
+                                    int ttl = nonPars.IndexOf(')') + 1;
+                                    int ttr = ttl;
+                                    while (!char.IsDigit(nonPars[ttr]))
+                                        ttr++;
+                                    dst.Cells[dst_row, 8].Value = nonPars.Substring(ttl, ttr - ttl - 1);
+
+                                    string a = get_numeric(nonPars, ttr);
+                                    dst.Cells[dst_row, 10].Value = a;
+                                    ttr += a.Length;
+                                    a = get_numeric(nonPars, ttr);
+                                    dst.Cells[dst_row, 11].Value = a;
+
+                                    var tmppars = nonPars.Substring(nonPars.IndexOf('(', ttl) + 1);
+                                    tmppars = tmppars.Remove(tmppars.IndexOf(')'));
+                                    var temps = tmppars.Split(new char[] { ';' }).ToList();
+                                    dst_row--;
+                                    bool bfirst = true;
+                                    foreach (var tmp in temps)
+                                    {
+                                        dst_row++;
+
+                                        if (!bfirst)
+                                            dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+
+                                        var b = get_numeric(tmp, 0);
+                                        dst.Cells[dst_row, 12].Value = b;
+                                        dst.Cells[dst_row, 13].Value = get_numeric(tmp, b.Length);
+                                        bfirst = false;
+                                    }
                                 }
                             }
                         }
@@ -359,7 +419,8 @@ namespace ExcelParser
             start.Invoke((MethodInvoker)delegate
             {
                 start.Enabled = true;
-            }); 
+                MessageBox.Show("Выполнено!", "Парсинг", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            });
         }
 
         private string get_value(string src, string valname)
@@ -471,8 +532,8 @@ namespace ExcelParser
             sec = 0;
             timer.Enabled = true;
 
-            Logger.LogMessage("INFO", "Open file " + Path.GetFullPath(@"2.xls"));
-            ex_serv.Workbooks.Open(Path.GetFullPath(@"3.xlsx"));
+            Logger.LogMessage("INFO", "Open file " + Path.GetFullPath(fileName));
+            ex_serv.Workbooks.Open(Path.GetFullPath(fileName));
             ex_serv.Workbooks.Add();
             ex_serv.Workbooks.Add();
             pars_thread.Start();
@@ -482,6 +543,22 @@ namespace ExcelParser
         {
             sec++;
             l_cur_time.Text = TimeSpan.FromSeconds(sec).ToString(@"hh\:mm\:ss");
+        }
+
+        private void b_file_Click(object sender, EventArgs e)
+        {
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                start.Enabled = true;
+                fileName = ofd.FileName;
+                link_file.Text = Path.GetFileName(fileName);
+            }
+            else
+            {
+                start.Enabled = false;
+                link_file.Text = "...";
+            }
+    
         }
     }
 }
