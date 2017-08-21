@@ -172,6 +172,13 @@ namespace ExcelParser
                 try
                 {
                     string nonPars = src.Cells[src_row, G31_1].Value;
+                    int tl;
+                    while ((tl = nonPars.IndexOf("_[=")) != -1)
+                    {
+                        int tr = nonPars.IndexOf("=]");
+                        nonPars = nonPars.Remove(tl, tr - tl + 3);
+                    }
+
                     dst.Cells[dst_row, 1].Value = src.Cells[src_row, dateColumn].Value;
                     dst.Cells[dst_row, 2].Value = src.Cells[src_row, G31_11].Value;
                     dst.Cells[dst_row, 3].Value = src.Cells[src_row, G022].Value;
@@ -232,20 +239,75 @@ namespace ExcelParser
                             bfirst = false;
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
-                        Logger.LogMessage(ex);
                         /*
                          * ДЕТАЛЬ МЕБЕЛЬНАЯ ИЗ КЛЕЕНОЙ БЕРЕЗОВОЙ ФАНЕРЫ СОРТ А/В, 9-ТИ СЛОЙНАЯ ТОЛЩИНОЙ 10ММ:700Х50Х10ММ-29,400М3(84000ШТ)._
                          * [=1=] :_[=1.1=]  Изготовитель: ОООТЕХНОФЛЕКС; Тов.знак: ОТСУТСТВУЕТ;
                         */
-                        dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
-                        dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
-                        var ssize = get_size_string(nonPars).Split(separator_size);
-                        dst.Cells[dst_row, 10].Value = ssize[0].Replace(',', '.');
-                        dst.Cells[dst_row, 11].Value = ssize[1].Replace(',', '.');
-                        dst.Cells[dst_row, 12].Value = ssize[2].Replace(',', '.');
-                        dst.Cells[dst_row, 13].Value2 = get_weight(nonPars);
+                        try
+                        {
+                            dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
+                            dst.Cells[dst_row, 9].Value = "ОТСУТСТВУЕТ";
+                            var ssize = get_size_string(nonPars).Split(separator_size);
+                            dst.Cells[dst_row, 10].Value = ssize[0].Replace(',', '.');
+                            dst.Cells[dst_row, 11].Value = ssize[1].Replace(',', '.');
+                            dst.Cells[dst_row, 12].Value = ssize[2].Replace(',', '.');
+                            dst.Cells[dst_row, 13].Value2 = get_weight(nonPars);
+                        }
+                        catch (Exception)
+                        {
+                            try
+                            {
+                                /*
+                                 * 1-ФАНЕРА КЛЕЕНАЯ, СОСТОЯЩАЯ ИСКЛЮЧИТЕЛЬНО ИЗ БЕРЕЗОВОГО ШПОНА МАРКИ ФК, ГОСТ 3916.1-96, РАЗМЕР 1525Х1525ММ, 
+                                 * НЕШЛИФОВАННАЯ,СОРТ 4/4, КЛАС ЭМИССИИ Е-1, КРОМКИ И ТОРЦЫ НЕ ИМЕЮТ ПАЗОВ И ГРЕБНЕЙ,: ТОЛЩИНА- 6ММ, 32 ПАКЕТА-32.15КУБ.М, 
+                                 * КОЛИЧЕСТВО СЛОЕВ-5, ТО_[=1=] ЛЩИНА КАЖДОГО СЛОЯ 1,2ММ, СПЕЦИФИКАЦИЯ №56,ЦЕНА 6ММ- 230 ЕВРО ДЛЯ СТРОИТЕЛЬНЫХ РАБОТ:_[=1.1=]  
+                                 * Изготовитель: ПК МАКСАТИХИНСКИЙ ЛЕСОПРОМЫШЛЕННЫЙ КОМБИНАТ; Тов.знак: ОТСУТСТВУЕТ;
+                                */
+                                dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
+                                dst.Cells[dst_row, 9].Value = get_value2(nonPars, "МАРКИ");
+                                int r = nonPars.IndexOf("РАЗМЕР");
+                                string a = get_numeric(nonPars, r);
+                                dst.Cells[dst_row, 10].Value = a;
+                                r += a.Length;
+                                dst.Cells[dst_row, 11].Value = get_numeric(nonPars, r);
+                                dst.Cells[dst_row, 12].Value = get_numeric(nonPars, nonPars.IndexOf("ТОЛЩИНА"));
+                                dst.Cells[dst_row, 13].Value = get_numeric(nonPars, nonPars.IndexOf("ПАКЕТА"));
+                            }
+                            catch (Exception)
+                            {
+                                /*
+                                1 - ФАНЕРА КЛЕЕНАЯ, СОСТОЯЩАЯ ИСКЛЮЧИТЕЛЬНО ИЗ БЕРЕЗОВОГО ШПОНА МАРКИ ФК, ГОСТ 3916.1 - 96, РАЗМЕР 1525Х1525ММ, 
+                                НЕШЛИФОВАННАЯ,СОРТ 4 / 4, КЛАС ЭМИССИИ Е - 1, КРОМКИ И ТОРЦЫ НЕ ИМЕЮТ ПАЗОВ И ГРЕБНЕЙ,: ТОЛЩИНА - 9ММ, 
+                                17ПАКЕТОВ - 17,08КУБ.М, КОЛИЧЕСТВО СЛОЕВ-7, ТОЛЩИНА - 15 ММ, 16 ПАКЕТОВ - 15,94 КУБ.М, КОЛИЧЕСТВО СЛОЕВ-11, 
+                                ТОЛЩИНА КАЖДОГО СЛОЯ 1,33ММ, СПЕЦИФИКАЦИЯ № 10, ЦЕНА 9ММ - 214ЕВРО,ЦЕНА 15 ММ - 207ЕВРО, ДЛЯ СТРОИТЕЛЬНЫХ РАБОТ: 
+                                Изготовитель: ПК МАКСАТИХИНСКИЙ ЛЕСОПРОМЫШЛЕННЫЙ КОМБИНАТ; Тов.знак: ОТСУТСТВУЕТ;
+                                */
+                                dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
+                                dst.Cells[dst_row, 9].Value = get_value2(nonPars, "МАРКИ");
+                                int r = nonPars.IndexOf("РАЗМЕР");
+                                string a = get_numeric(nonPars, r);
+                                dst.Cells[dst_row, 10].Value = a;
+                                r += a.Length;
+                                dst_row--;
+                                dst.Cells[dst_row, 11].Value = get_numeric(nonPars, r);
+                                bool bfirst = true;
+
+                                var temps = nonPars.Split(new string[] { "ТОЛЩИНА - " }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                                temps.RemoveAt(0);
+                                foreach (var tmp in temps)
+                                {
+                                    dst_row++;
+
+                                    if (!bfirst)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 12].Value = get_numeric(tmp, 0);
+                                    dst.Cells[dst_row, 13].Value = get_numeric(tmp, nonPars.IndexOf("ПАКЕТОВ"));
+                                    bfirst = false;
+                                }
+                            }
+                        }
                     }
                     dst_row++;
                     lproc++;
@@ -262,9 +324,9 @@ namespace ExcelParser
                 }
 
                 pg_bar.Invoke((MethodInvoker)delegate
-                {
-                    pg_bar.Value = src_row-1;
-                });
+                            {
+                                pg_bar.Value = src_row - 1;
+                            });
                 l_proc.Invoke((MethodInvoker)delegate
                 {
                     l_proc.Text = lproc.ToString();
@@ -294,7 +356,10 @@ namespace ExcelParser
                 ex_serv.Workbooks[3].Close();*/
             ex_serv.Visible = true;
             timer.Enabled = false;
-            start.Enabled = true;
+            start.Invoke((MethodInvoker)delegate
+            {
+                start.Enabled = true;
+            }); 
         }
 
         private string get_value(string src, string valname)
@@ -380,6 +445,22 @@ namespace ExcelParser
             return src.Substring(l + 1, r - l).Replace(',', '.');
         }
 
+        private string get_numeric(string src, int pos)
+        {
+            int l = pos;
+            while (l < src.Length && !char.IsDigit(src[l])) l++;
+            int r = l;
+            bool fl = true;
+            while (r < src.Length && (char.IsDigit(src[r]) || fl && (src[r] == ',' || src[r] == '.')))
+            {
+                if (src[r] == ',' || src[r] == '.')
+                    fl = false;
+                r++;
+            }
+
+            return src.Substring(l, r - l).Trim(new char[] { ' ', ',', '.' }).Replace(',', '.');
+        }
+
         private void start_Click(object sender, EventArgs e)
         {
             start.Enabled = false;
@@ -391,7 +472,7 @@ namespace ExcelParser
             timer.Enabled = true;
 
             Logger.LogMessage("INFO", "Open file " + Path.GetFullPath(@"2.xls"));
-            ex_serv.Workbooks.Open(Path.GetFullPath(@"2.xls"));
+            ex_serv.Workbooks.Open(Path.GetFullPath(@"3.xlsx"));
             ex_serv.Workbooks.Add();
             ex_serv.Workbooks.Add();
             pars_thread.Start();
