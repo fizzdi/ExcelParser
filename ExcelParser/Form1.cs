@@ -167,6 +167,7 @@ namespace ExcelParser
             int lproc = 0;
             long sumTicks = 0;
 
+            char[] seps = new char[] { ';', '.', '(', ')', '-', ':' };
             List<string> sep_sort = new List<string>();
             for (int i = 1; i < 50; ++i)
             {
@@ -181,7 +182,9 @@ namespace ExcelParser
             string[] dbr = new string[] { "DBR 120/120", "DBR120/120", "DBR 220/220", "DBR220/220",
                                     "S2S", "DB 120/120", "DB120/120", "DB220/220", "DB 220/220",
                 "DECK350/DECK350", "DB LOGO 120/120",
-                "DB 120/220", "DBPERIBRCH120/DBPERIBRC", "120/120 DB LOGO", "GRN120/120", "GRY 220/220", "BLK120/120", "DBR 120/220", "LBR 120/120", "LBR120/120:*2", "LBR120/120"};
+                "DB 120/220", "DBPERIBRCH120/DBPERIBRC", "120/120 DB LOGO", "GRN120/120", "GRY 220/220",
+                "BLK120/120", "DBR 120/220", "LBR 120/120", "LBR120/120:*2", "LBR120/120", "DECK350", "CARB", "PH2", "FSC 100%",
+            "*120/120", "120/120", "*220/220", "120/220", "220/220", "DBR", "FSC-CW NC-COC-023878"};
 
             string[] separator = new string[1] { "Изготовитель" };
             for (int src_row = 2; src_row <= srcMaxRows; src_row++)
@@ -210,10 +213,10 @@ namespace ExcelParser
                     dst.Cells[dst_row, 7].Value = src.Cells[src_row, G2021].Value;
                     dst.Cells[dst_row, 8].EntireColumn.NumberFormat = "@";
                     dst.Cells[dst_row, 9].EntireColumn.NumberFormat = "@";
-                    dst.get_Range(String.Format("{0}1", (char)('A' + 10)), String.Format("{0}65535", (char)('A' + 10))).NumberFormat = "#.0####";
-                    dst.get_Range(String.Format("{0}1", (char)('A' + 11)), String.Format("{0}65535", (char)('A' + 11))).NumberFormat = "#.0####";
-                    dst.get_Range(String.Format("{0}1", (char)('A' + 12)), String.Format("{0}65535", (char)('A' + 12))).NumberFormat = "#.0####";
-                    dst.get_Range(String.Format("{0}1", (char)('A' + 13)), String.Format("{0}65535", (char)('A' + 13))).NumberFormat = "#.0####";
+                    dst.get_Range(String.Format("{0}1", (char)('A' + 10)), String.Format("{0}65535", (char)('A' + 10))).NumberFormat = "#0.0####";
+                    dst.get_Range(String.Format("{0}1", (char)('A' + 11)), String.Format("{0}65535", (char)('A' + 11))).NumberFormat = "#0.0####";
+                    dst.get_Range(String.Format("{0}1", (char)('A' + 12)), String.Format("{0}65535", (char)('A' + 12))).NumberFormat = "#0.0####";
+                    dst.get_Range(String.Format("{0}1", (char)('A' + 13)), String.Format("{0}65535", (char)('A' + 13))).NumberFormat = "#0.0####";
                     dst.Cells[dst_row, 14].Formula = String.Format("=O{0}/M{0}", dst_row);
                     dst.Cells[dst_row, 15].Value = src.Cells[src_row, G42].Value;
                     dst.Cells[dst_row, 16].Value = src.Cells[src_row, G221].Value;
@@ -236,12 +239,17 @@ namespace ExcelParser
                         case "МОРОЗОВА":
                         case "МИХАЙЛОВА":
                             {
+                                List<string[]> toex = new List<string[]>();
+                                toex.Add(new string[6]);
                                 int indst = nonPars.IndexOf(')') + 1;
                                 int indfin = nonPars.IndexOf(":_1.1", indst);
                                 string tmp = nonPars.Substring(indst, indfin - indst).Trim().Replace("_1.", "").Replace(" L ", "");
-                                char[] seps = new char[] { ';', '.', '(', ')', '-', ':' };
-                                dst.Cells[dst_row, 9].Value = get_value(nonPars, "марка");
+                                toex.Last()[1] = get_value(nonPars, "марка");
                                 int tr = -1;
+                                tmp = tmp.Replace("m3,", "m3.");
+                                tmp = tmp.Replace("м3,", "м3.");
+                                tmp = tmp.Replace("М3,", "М3.");
+                                tmp = tmp.Replace("M3,", "M3.");
                                 while ((tr = tmp.IndexOf(" м3")) != -1)
                                 {
                                     tmp = tmp.Replace(" м3", "м3");
@@ -288,24 +296,24 @@ namespace ExcelParser
                                         tmp = tmpsb.ToString();
                                     }
                                 }
-                                List<string> strs = tmp.Split(seps, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim().Trim(',').Trim()).ToList();
+                                List<string> strs = tmp.Split(seps, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim().Trim(',').Trim()).Where(x => !String.IsNullOrEmpty(x)).ToList();
 
                                 bool sz = false, srt = false, w = false, v = false;
-                                string[] add_sort = new string[] { "1/2", "1/1", "1/3" };
+                                string[] add_sort = new string[] { "1/2", "1/1", "1/3", "2/1" };
                                 string sort = "";
+
                                 foreach (string str in strs)
                                 {
                                     if (sz && srt && w && v)
                                     {
-                                        dst_row++;
-                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                        toex.Add((string[])toex.Last().Clone());
                                         v = false;
                                         if (srt)
-                                            dst.Cells[dst_row, 8].Value = sort;
+                                            toex.Last()[0] = sort;
                                     }
                                     if (add_sort.Contains(str))
                                     {
-                                        dst.Cells[dst_row, 8].Value = sort + " " + str;
+                                        toex.Last()[0] = sort + " " + str;
                                         srt = true;
                                         v = false;
                                         continue;
@@ -313,12 +321,12 @@ namespace ExcelParser
                                     string low = str.ToLower();
                                     if (low.Contains("м3") || low.Contains("m3")) //объем
                                     {
-                                        dst.Cells[dst_row, 13].Value2 = get_numeric(str);
+                                        toex.Last()[5] = get_numeric(str);
                                         v = true;
                                     }
                                     else if (low.Contains("mm") || low.Contains("мм")) //толщина
                                     {
-                                        dst.Cells[dst_row, 12].Value2 = get_numeric(str);
+                                        toex.Last()[4] = get_numeric(str);
                                         w = true;
                                         v = false;
                                     }
@@ -326,14 +334,14 @@ namespace ExcelParser
                                                                      //else if (low.Contains("*") || low.Contains("x") || low.Contains("х")) //размер
                                     {
                                         var s = low.Split(separator_size).Select(x => x.Trim()).ToArray();
-                                        dst.Cells[dst_row, 10].Value2 = get_numeric(s[0]);
-                                        dst.Cells[dst_row, 11].Value2 = get_numeric(s[1]);
+                                        toex.Last()[2] = get_numeric(s[0]);
+                                        toex.Last()[3] = get_numeric(s[1]);
                                         sz = true;
                                         v = false;
                                     }
                                     else //sort
                                     {
-                                        dst.Cells[dst_row, 8].Value = str;
+                                        toex.Last()[0] = str;
                                         sort = str;
                                         srt = true;
                                         v = false;
@@ -342,7 +350,21 @@ namespace ExcelParser
 
                                 if (!v)
                                 {
-                                    dst.Cells[dst_row, 13].Value2 = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.'); ;
+                                    toex.Last()[5] = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.'); ;
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
                                 }
                             }
                             break;
@@ -351,18 +373,13 @@ namespace ExcelParser
                             {
                                 var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                                 temps.RemoveAt(0);
-                                dst.Cells[dst_row, 8].Value = nonPars;
-                                bool bfirst = true;
 
-
-                                dst_row--;
+                                List<List<string>> toex = new List<List<string>>();
                                 foreach (var tmp in temps)
                                 {
-                                    dst_row++;
-                                    if (!bfirst)
-                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                    dst.Cells[dst_row, 8].Value = get_value(tmp, "Сорт");
-                                    dst.Cells[dst_row, 9].Value = get_value(tmp, "Марка");
+                                    toex.Add(new List<string>());
+                                    toex.Last().Add(get_value(tmp, "Сорт"));
+                                    toex.Last().Add(get_value(tmp, "Марка"));
                                     var string_size = get_value(tmp, "Размер");
                                     if (string_size != "ОТСУТСТВУЕТ")
                                     {
@@ -370,27 +387,197 @@ namespace ExcelParser
                                             string_size = string_size.Substring(0, string_size.IndexOf(' '));
                                         while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
                                             string_size = string_size.Remove(string_size.Length - 1);
-
                                     }
                                     var ssize = string_size.Split(separator_size);
-                                    dst.Cells[dst_row, 10].Value2 = ssize[0].Replace(',', '.');
-                                    dst.Cells[dst_row, 11].Value2 = ssize[1].Replace(',', '.');
-                                    dst.Cells[dst_row, 12].Value2 = get_numeric(nonPars, nonPars.IndexOf("ТОЛЩИНА")); ;
+                                    toex.Last().Add(ssize[0].Replace(',', '.'));
+                                    toex.Last().Add(ssize[1].Replace(',', '.'));
+                                    toex.Last().Add(get_numeric(tmp, nonPars.IndexOf("ТОЛЩИНА")));
 
                                     string volume = get_value(tmp, "Кол-во");
                                     volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
                                     if (volume == "ОТСУТСТВУЕТ")
                                         volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                    dst.Cells[dst_row, 13].Value2 = volume;
-                                    bfirst = false;
+                                    toex.Last().Add(volume);
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
                                 }
                             }
                             break;
-                        case "КИСЕЛЕВА":
+                        case "ГУЛИН":
                             {
-                                throw new Exception("КИСЕЛЕВА");
+                                var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+                                temps.RemoveAt(0);
+
+                                List<List<string>> toex = new List<List<string>>();
+                                foreach (var tmp in temps)
+                                {
+                                    toex.Add(new List<string>());
+                                    string srt = get_value(tmp, "Сорт");
+                                    if (srt == "ОТСУТСТВУЕТ")
+                                        srt = "";
+                                    string add_srt = get_value(tmp, "Сортимент");
+                                    if (add_srt == "ОТСУТСТВУЕТ")
+                                        add_srt = "";
+                                    if (srt == add_srt)
+                                        add_srt = "";
+                                    toex.Last().Add(srt + (add_srt != "" ? " " : "") + add_srt);
+                                    toex.Last().Add("ОТСУТСТВУЕТ");
+                                    var string_size = get_value(tmp, "Размер");
+
+                                    var ssize = string_size.Split('X', 'Х', 'x', 'х', ' ', '*');
+                                    toex.Last().Add(get_numeric(ssize[0]));
+                                    toex.Last().Add(get_numeric(ssize[1]));
+                                    toex.Last().Add(get_numeric(ssize[2]));
+
+                                    string volume = get_value(tmp, "Кол-во");
+                                    volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
+                                    if (volume == "ОТСУТСТВУЕТ")
+                                        volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
+                                    toex.Last().Add(volume);
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
+                                }
                             }
                             break;
+                        case "БАРАНОВ":
+                            {
+                                int ind = nonPars.IndexOf("СОРТ");
+                                int ind2 = nonPars.IndexOf("РАЗМЕР");
+                                if (ind2 > -1 && ind2 < ind)
+                                    ind = ind2;
+                                nonPars = nonPars.Substring(ind);
+                                nonPars = nonPars.Substring(0, nonPars.IndexOf("Изготовитель"));
+                                List<string[]> toex = new List<string[]>();
+                                toex.Add(new string[6]);
+                                var tmp = get_value2(nonPars, "СОРТ");
+                                toex[0][0] = tmp.Substring(0, tmp.IndexOf(':'));
+                                toex[0][1] = "ОТСУТСТВУЕТ";
+                                foreach(var c in sep_sort)
+                                {
+                                    nonPars = nonPars.Replace(c, "");
+                                }
+                                nonPars = nonPars.Replace("_", "");
+                                if (nonPars.Contains("РАЗМЕР"))
+                                {
+                                    var a = get_value2(nonPars, "РАЗМЕР");
+                                    var b = get_numeric(a);
+                                toex[0][2] = b;
+                                    b = get_numeric(a, a.IndexOf(b));
+                                    toex[0][3] = b;
+                                    var temps = nonPars.Split(new string[] { "ТОЛЩИНОЙ" }, StringSplitOptions.RemoveEmptyEntries);
+                                    for (int i = 1; i < temps.Length; ++i)
+                                    {
+                                        if (i != 1)
+                                            toex.Add((string[])toex.Last().Clone());
+                                        toex[i - 1][4] = get_numeric(temps[i]);
+                                        toex[i - 1][5] = get_weight(temps[i]);
+                                    }
+                                }
+                                else
+                                {
+                                    nonPars = nonPars.Substring(nonPars.IndexOf(':'));
+                                    var temps = nonPars.Split(';');
+                                    for (int i = 0; i < temps.Length; ++i)
+                                    {
+                                        if (i != 0)
+                                            toex.Add((string[])toex.Last().Clone());
+                                        var sz = temps[i].Split(separator_size);
+                                        toex[i][2] = get_numeric(sz[0]);
+                                        toex[i][3] = get_numeric(sz[1]);
+                                        toex[i][4] = get_numeric(sz[2]);
+                                        toex[i][5] = get_weight(sz[2]);
+                                    }
+                                }
+                                
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
+                                }
+                            }
+                            break;
+                        case "КОЧКИН":
+                        case "ЧУГУНОВ":
+                            {
+                                var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+                                temps.RemoveAt(0);
+
+                                List<List<string>> toex = new List<List<string>>();
+                                foreach (var tmp in temps)
+                                {
+                                    toex.Add(new List<string>());
+                                    toex.Last().Add(get_value(tmp, "Сорт"));
+                                    toex.Last().Add(get_value(tmp, "Марка"));
+                                    var string_size = get_value(tmp, "Размер");
+                                    if (string_size != "ОТСУТСТВУЕТ")
+                                    {
+                                        if (string_size.IndexOf(' ') != -1)
+                                            string_size = string_size.Substring(0, string_size.IndexOf(' '));
+                                        while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
+                                            string_size = string_size.Remove(string_size.Length - 1);
+                                    }
+                                    var ssize = string_size.Split(separator_size);
+                                    toex.Last().Add(get_numeric(ssize[1]));
+                                    toex.Last().Add(get_numeric(ssize[2]));
+                                    toex.Last().Add(get_numeric(ssize[0]));
+
+                                    string volume = get_value(tmp, "Кол-во");
+                                    volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
+                                    if (volume == "ОТСУТСТВУЕТ")
+                                        volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
+                                    toex.Last().Add(volume);
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
+                                }
+                            }
+                            break;
+                        case "ЧУЧИНА":
+                        case "БЕЛЬСТНЕР":
                         case "КОНСТАНТИНОВ":
                         case "ЛАЗУТКИНА":
                         case "МОХОВА":
@@ -400,48 +587,43 @@ namespace ExcelParser
                                 {
                                     var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                                     temps.RemoveAt(0);
-                                    dst.Cells[dst_row, 8].Value = nonPars;
-                                    bool bfirst = true;
 
-
-                                    dst_row--;
+                                    List<List<string>> toex = new List<List<string>>();
                                     foreach (var tmp in temps)
                                     {
-                                        dst_row++;
-                                        if (!bfirst)
-                                            dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                        toex.Add(new List<string>());
                                         string srt = get_value(tmp, "Сорт");
                                         if (srt == "ОТСУТСТВУЕТ")
                                             throw new Exception("Нет сорта");
-                                        dst.Cells[dst_row, 8].Value = get_value(tmp, "Сорт");
-                                        dst.Cells[dst_row, 9].Value = get_value(tmp, "Марка");
+                                        toex.Last().Add(srt);
+                                        toex.Last().Add(get_value(tmp, "Марка"));
                                         var string_size = get_value(tmp, "Размер");
-                                        if (string_size != "ОТСУТСТВУЕТ")
-                                        {
-                                            if (string_size.IndexOf(' ') != -1)
-                                                string_size = string_size.Substring(0, string_size.IndexOf(' '));
-                                            while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
-                                                string_size = string_size.Remove(string_size.Length - 1);
-
-                                        }
                                         var ssize = string_size.Split(separator_size);
-                                        dst.Cells[dst_row, 10].Value2 = ssize[0].Replace(',', '.');
-                                        dst.Cells[dst_row, 11].Value2 = ssize[1].Replace(',', '.');
-                                        for (int i = 0; i < ssize[2].Length; ++i)
-                                        {
-                                            if (char.IsDigit(ssize[2][i]) || ssize[2][i] == ',' || ssize[2][i] == '.') continue;
-                                            ssize[2] = ssize[2].Substring(0, i);
-                                            break;
-                                        }
-                                        dst.Cells[dst_row, 12].Value2 = ssize[2].Replace(',', '.');
+                                        toex.Last().Add(ssize[0].Replace(',', '.'));
+                                        toex.Last().Add(ssize[1].Replace(',', '.'));
+                                        toex.Last().Add(get_numeric(ssize[2]));
 
                                         string volume = get_value(tmp, "Кол-во");
                                         volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
                                         if (volume == "ОТСУТСТВУЕТ")
                                             volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                        dst.Cells[dst_row, 13].Value2 = volume;
-                                        bfirst = false;
+                                        toex.Last().Add(volume);
                                     }
+
+                                    for (int i = 0; i < toex.Count; ++i)
+                                    {
+                                        if (i != 0)
+                                            dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                        dst.Cells[dst_row, 8].Value = toex[i][0];
+                                        dst.Cells[dst_row, 9].Value = toex[i][1];
+                                        dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                        dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                        dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                        dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                        if (i + 1 != toex.Count)
+                                            dst_row++;
+                                    }
+
                                 }
                                 catch (Exception)
                                 {
@@ -536,19 +718,29 @@ namespace ExcelParser
                                 }
                             }
                             break;
-                        case "ГОЛИКОВА":
-                        case "ЗАТЕЙ":
-                        case "ПОКАЗИЙ":
                         case "АСТАПОВ":
-                            {
-                                throw new Exception("СЛОЖНО");
-                            }
-                            break;
+                        case "ГОЛИКОВА":
+                        case "ДУБОВЦЕВА":
+                        case "ЕФРЕМОВА":
+                        case "ЗАТЕЙ":
+                        case "ЗАХАРОВА":
+                        case "ПОКАЗИЙ":
+                        case "КИСЕЛЕВА":
+                        case "ЛОБАНОВА":
                         case "МАЛЫШЕВА":
+                        case "МЕЛКОЗЕРОВА":
+                        case "НИКИТЕНКО":
                         case "ОВЧИННИКОВА":
                         case "РОЩЕКТАЕВА":
+                        case "СОЛОГУБОВА":
+                        case "ТРИФОНОВ":
+                        case "РУСИНОВ":
+                        case "ВАРЕНЦОВА":
+                        case "СМИРНОВА":
+                        case "ОРЕХОВА":
+                        case "КАРАМЫШЕВА":
                             {
-                                throw new Exception("НАО СВЕЗА ВЕРХНЯЯ СИНЯЧИХА");
+                                throw new Exception("НЕ ПРИДУМАЛ");
                             }
                             break;
                         case "СИТДИКОВА":
@@ -556,36 +748,100 @@ namespace ExcelParser
                             {
                                 var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                                 temps.RemoveAt(0);
-                                dst.Cells[dst_row, 8].Value = nonPars;
-                                bool bfirst = true;
+
                                 List<List<string>> toex = new List<List<string>>();
-                                dst_row--;
                                 foreach (var tmp in temps)
                                 {
-                                    dst_row++;
-                                    if (!bfirst)
-                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                    dst.Cells[dst_row, 8].Value = get_value(tmp, "Сорт");
-                                    dst.Cells[dst_row, 9].Value = get_value(tmp, "Марка");
-                                    var string_size = get_value(tmp, "Размер");
-                                    if (string_size != "ОТСУТСТВУЕТ")
-                                    {
-                                        if (string_size.IndexOf(' ') != -1)
-                                            string_size = string_size.Substring(0, string_size.IndexOf(' '));
-                                        while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
-                                            string_size = string_size.Remove(string_size.Length - 1);
-
-                                    }
-                                    dst.Cells[dst_row, 10].Value2 = get_numeric(tmp, tmp.IndexOf("ДЛИНА")); ;
-                                    dst.Cells[dst_row, 11].Value2 = get_numeric(tmp, tmp.IndexOf("ШИРИНА")); ;
-                                    dst.Cells[dst_row, 12].Value2 = get_numeric(tmp, tmp.IndexOf("ТОЛЩИНА")); ;
+                                    toex.Add(new List<string>());
+                                    toex.Last().Add(get_value(tmp, "Сорт"));
+                                    toex.Last().Add(get_value(tmp, "Марка"));
+                                    toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ДЛИНА")));
+                                    toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ШИРИНА")));
+                                    toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ТОЛЩИНА")));
 
                                     string volume = get_value(tmp, "Кол-во");
                                     volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
                                     if (volume == "ОТСУТСТВУЕТ")
                                         volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                    dst.Cells[dst_row, 13].Value2 = volume;
-                                    bfirst = false;
+                                    toex.Last().Add(volume);
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
+                                }
+                            }
+                            break;
+
+                        case "МОРОЗОВ":
+                            {
+
+                                dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
+                                if (nonPars.ToLower().Contains("нешлифованная"))
+                                    dst.Cells[dst_row, 8].Value += " НШ";
+                                dst.Cells[dst_row, 9].Value2 = get_value2(nonPars, "МАРКА");
+                                dst.Cells[dst_row, 10].Value = get_numeric(nonPars, nonPars.IndexOf("ДЛИНА"));
+                                dst.Cells[dst_row, 11].Value2 = get_numeric(nonPars, nonPars.IndexOf("ШИРИНА"));
+                                dst.Cells[dst_row, 12].Value2 = get_numeric(nonPars, nonPars.IndexOf("ТОЛЩИНА"));
+                                dst.Cells[dst_row, 13].Value2 = get_weight(nonPars);
+
+                            }
+                            break;
+
+                        case "ХРИСТОФОРОВА":
+                            {
+                                int r = 0;
+                                while ((r = nonPars.IndexOf('(', 0)) != -1)
+                                {
+                                    nonPars = nonPars.Remove(r, nonPars.IndexOf(')', r) - r + 1);
+                                }
+                                nonPars = nonPars.Replace("_1.", "").Replace("_2.", "").Replace(" -", " ").Replace("- ", " ");
+                                var strs = nonPars.Split(new string[] { "СОРТ" }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToList();
+                                strs.RemoveAt(0);
+
+                                List<List<string>> toex = new List<List<string>>();
+                                foreach (var tmp in strs)
+                                {
+                                    toex.Add(new List<string>());
+                                    var tmps = tmp.Split(new char[] { ' ', '*' }, StringSplitOptions.RemoveEmptyEntries);
+                                    toex.Last().Add(tmps[0]);
+                                    if (tmps[1] == "INTERIOR")
+                                        tmps[1] = "ФК";
+                                    if (tmps[1] == "EXTERIOR")
+                                        tmps[1] = "ФСФ";
+                                    toex.Last().Add(tmps[1]);
+                                    toex.Last().Add(tmps[2]);
+                                    toex.Last().Add(tmps[3]);
+                                    toex.Last().Add(get_numeric(tmps[4]));
+                                    if (strs.Count == 1)
+                                    {
+                                        toex.Last().Add(get_weight(tmp));
+                                    }
+                                    else
+                                        toex.Last().Add(get_numeric(tmps[5]));
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
                                 }
                             }
                             break;
@@ -593,28 +849,36 @@ namespace ExcelParser
                             {
                                 var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                                 temps.RemoveAt(0);
-                                dst.Cells[dst_row, 8].Value = nonPars;
-                                bool bfirst = true;
 
-
-                                dst_row--;
+                                List<List<string>> toex = new List<List<string>>();
                                 foreach (var tmp in temps)
                                 {
-                                    dst_row++;
-                                    if (!bfirst)
-                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                    dst.Cells[dst_row, 8].Value = get_value(tmp, "Сорт");
-                                    dst.Cells[dst_row, 9].Value = get_value(tmp, "Марка");
-                                    dst.Cells[dst_row, 10].Value2 = get_numeric(tmp, tmp.IndexOf("ДЛИНА")); ;
-                                    dst.Cells[dst_row, 11].Value2 = get_numeric(tmp, tmp.IndexOf("ШИРИНА")); ;
-                                    dst.Cells[dst_row, 12].Value2 = get_numeric(tmp, tmp.IndexOf("ТОЛЩИНА")); ;
+                                    toex.Add(new List<string>());
+                                    toex.Last().Add(get_value(tmp, "Сорт"));
+                                    toex.Last().Add(get_value(tmp, "Марка"));
+                                    toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ДЛИНА")));
+                                    toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ШИРИНА")));
+                                    toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ТОЛЩИНА")));
 
                                     string volume = get_value(tmp, "Кол-во");
                                     volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
                                     if (volume == "ОТСУТСТВУЕТ")
                                         volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                    dst.Cells[dst_row, 13].Value2 = volume;
-                                    bfirst = false;
+                                    toex.Last().Add(volume);
+                                }
+
+                                for (int i = 0; i < toex.Count; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    dst.Cells[dst_row, 8].Value = toex[i][0];
+                                    dst.Cells[dst_row, 9].Value = toex[i][1];
+                                    dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                    dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                    dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                    dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                    if (i + 1 != toex.Count)
+                                        dst_row++;
                                 }
                             }
                             break;
@@ -624,18 +888,13 @@ namespace ExcelParser
                                 {
                                     var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                                     temps.RemoveAt(0);
-                                    dst.Cells[dst_row, 8].Value = nonPars;
-                                    bool bfirst = true;
 
-
-                                    dst_row--;
+                                    List<List<string>> toex = new List<List<string>>();
                                     foreach (var tmp in temps)
                                     {
-                                        dst_row++;
-                                        if (!bfirst)
-                                            dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                        dst.Cells[dst_row, 8].Value = get_value(tmp, "Сорт");
-                                        dst.Cells[dst_row, 9].Value = get_value(tmp, "Марка");
+                                        toex.Add(new List<string>());
+                                        toex.Last().Add(get_value(tmp, "Сорт"));
+                                        toex.Last().Add(get_value(tmp, "Марка"));
                                         var string_size = get_value(tmp, "Размер");
                                         if (string_size != "ОТСУТСТВУЕТ")
                                         {
@@ -643,25 +902,31 @@ namespace ExcelParser
                                                 string_size = string_size.Substring(0, string_size.IndexOf(' '));
                                             while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
                                                 string_size = string_size.Remove(string_size.Length - 1);
-
                                         }
                                         var ssize = string_size.Split(separator_size);
-                                        dst.Cells[dst_row, 10].Value2 = ssize[0].Replace(',', '.');
-                                        dst.Cells[dst_row, 11].Value2 = ssize[1].Replace(',', '.');
-                                        for (int i = 0; i < ssize[2].Length; ++i)
-                                        {
-                                            if (char.IsDigit(ssize[2][i]) || ssize[2][i] == ',' || ssize[2][i] == '.') continue;
-                                            ssize[2] = ssize[2].Substring(0, i);
-                                            break;
-                                        }
-                                        dst.Cells[dst_row, 12].Value2 = ssize[2].Replace(',', '.');
+                                        toex.Last().Add(ssize[0].Replace(',', '.'));
+                                        toex.Last().Add(ssize[1].Replace(',', '.'));
+                                        toex.Last().Add(get_numeric(ssize[2]));
 
                                         string volume = get_value(tmp, "Кол-во");
                                         volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
                                         if (volume == "ОТСУТСТВУЕТ")
                                             volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                        dst.Cells[dst_row, 13].Value2 = volume;
-                                        bfirst = false;
+                                        toex.Last().Add(volume);
+                                    }
+
+                                    for (int i = 0; i < toex.Count; ++i)
+                                    {
+                                        if (i != 0)
+                                            dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                        dst.Cells[dst_row, 8].Value = toex[i][0];
+                                        dst.Cells[dst_row, 9].Value = toex[i][1];
+                                        dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                        dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                        dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                        dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                        if (i + 1 != toex.Count)
+                                            dst_row++;
                                     }
                                 }
                                 catch (Exception)
