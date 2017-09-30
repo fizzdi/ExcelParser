@@ -23,7 +23,17 @@ namespace ExcelParser
         System.Windows.Forms.Timer timer = null;
         char[] separator_size = new char[5] { 'X', 'x', '*', 'Х', 'х' };
         String fileName;
-
+        //eopakxcm
+        Tuple<char, char>[] char_analog = new Tuple<char, char>[] {
+            new Tuple<char, char>('e', 'е'),
+            new Tuple<char, char>('o', 'о'),
+            new Tuple<char, char>('p', 'р'),
+            new Tuple<char, char>('a', 'а'),
+            new Tuple<char, char>('k', 'к'),
+            new Tuple<char, char>('x', 'х'),
+            new Tuple<char, char>('c', 'с'),
+            new Tuple<char, char>('m', 'м')
+        };
         public Form1()
         {
             InitializeComponent();
@@ -87,6 +97,7 @@ namespace ExcelParser
             AddHeaderColumn(dst, "P1", "G221 (Код валюты фактурной стоимости)");
             AddHeaderColumn(dst, "Q1", "Средняя статистическая");
             AddHeaderColumn(dst, "R1", "G46 (Статистическая стоимость товара в USD)");
+            AddHeaderColumn(dst, "S1", "G5441 - Брокер Ф.И.О.");
         }
 
         private int GetColumnNumber(Excel.Worksheet src, string prefix)
@@ -113,9 +124,14 @@ namespace ExcelParser
 
         private bool checkMaker(string a, string b)
         {
+            foreach (var cur in char_analog)
+            {
+                a = a.Replace(cur.Item1, cur.Item2);
+                b = b.Replace(cur.Item1, cur.Item2);
+            }
             b = b.ToLower();
             var vb = b.Split(new char[] { ' ', '"', '<', ',', '>', '-' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var c in vb)
+            foreach (string c in vb)
                 if (!a.Contains(c))
                     return false;
             return true;
@@ -177,7 +193,7 @@ namespace ExcelParser
             int lproc = 0;
             long sumTicks = 0;
 
-            char[] seps = new char[] { ';', '.', '(', ')', '-', ':' };
+            char[] seps = new char[] { ';', '.', '(', ')', '-', ':', ' ' };
             List<string> sep_sort = new List<string>();
             for (int i = 1; i < 50; ++i)
             {
@@ -237,6 +253,7 @@ namespace ExcelParser
                     dst.Cells[dst_row, 16].Value = src.Cells[src_row, G221].Value;
                     dst.Cells[dst_row, 17].Formula = String.Format("=R{0}/M{0}", dst_row);
                     dst.Cells[dst_row, 18].Value = src.Cells[src_row, G46].Value;
+                    dst.Cells[dst_row, 19].Value = src.Cells[src_row, G5441].Value;
 
                     string maker = src.Cells[src_row, G31_11].Value;
                     maker = maker.Replace("\"", "").Replace(" ", "").ToLower();
@@ -247,13 +264,14 @@ namespace ExcelParser
                         toex.Add(new string[6]);
                         int indst = nonPars.IndexOf(')') + 1;
                         int indfin = nonPars.IndexOf(":_1.1", indst);
-                        string tmp = nonPars.Substring(indst, indfin - indst).Trim().Replace("_1.", "").Replace(" L ", "");
+                        string tmp = nonPars.Substring(indst, indfin - indst).Trim().Replace("_1.", "").Replace("L ", "");
                         toex.Last()[1] = get_value(nonPars, "марка");
                         int tr = -1;
                         tmp = tmp.Replace("m3,", "m3.");
                         tmp = tmp.Replace("м3,", "м3.");
                         tmp = tmp.Replace("М3,", "М3.");
                         tmp = tmp.Replace("M3,", "M3.");
+                        tmp = tmp.Replace("MR", "");
                         while ((tr = tmp.IndexOf(" м3")) != -1)
                         {
                             tmp = tmp.Replace(" м3", "м3");
@@ -308,6 +326,7 @@ namespace ExcelParser
 
                         foreach (string str in strs)
                         {
+                            if (str.ToLower().Contains("шт")) continue;
                             if (sz && srt && w && v)
                             {
                                 toex.Add((string[])toex.Last().Clone());
@@ -328,7 +347,7 @@ namespace ExcelParser
                                 toex.Last()[5] = get_numeric(str);
                                 v = true;
                             }
-                            else if (low.Contains("mm") || low.Contains("мм")) //толщина
+                            else if (low.Contains("m") || low.Contains("м")) //толщина
                             {
                                 toex.Last()[4] = get_numeric(str);
                                 w = true;
@@ -371,7 +390,158 @@ namespace ExcelParser
                                 dst_row++;
                         }
                     }
-                    if (checkMaker(maker, "ООО \"ПФК - СЕРВИС\""))
+                    else if (checkMaker(maker, "НАО \"СВЕЗА ВЕРХНЯЯ СИНЯЧИХА\""))
+                    {
+                        List<string[]> toex = new List<string[]>();
+                        toex.Add(new string[6]);
+                        int indst = nonPars.IndexOf(';') + 1;
+                        while (indst < nonPars.Length && nonPars[indst] == ' ') indst++;
+                        int tmpind = nonPars.IndexOf("ОБЩЕГО НАЗНАЧЕНИЯ");
+                        if (tmpind >= 0)
+                            indst = tmpind + 17;
+                        else
+                            throw new Exception("");
+                        int indfin = nonPars.IndexOf("_1.1", indst);
+                        string tmp = nonPars.Substring(indst, indfin - indst).Trim().Replace("_1.", "").Replace("L ", "");
+                        int tr = -1;
+                        tmp = tmp.Replace("m3,", "m3.");
+                        tmp = tmp.Replace("м3,", "м3.");
+                        tmp = tmp.Replace("М3,", "М3.");
+                        tmp = tmp.Replace("M3,", "M3.");
+                        tmp = tmp.Replace(" /", "/");
+                        tmp = tmp.Replace("/ ", "/");
+                        tmp = tmp.Replace("X ", "x");
+                        tmp = tmp.Replace("Х ", "х");
+                        while ((tr = tmp.IndexOf(" м3")) != -1)
+                        {
+                            tmp = tmp.Replace(" м3", "м3");
+                        }
+
+                        while ((tr = tmp.IndexOf(" М3")) != -1)
+                        {
+                            tmp = tmp.Replace(" М3", "М3");
+                        }
+                        while ((tr = tmp.IndexOf(" m3")) != -1)
+                        {
+                            tmp = tmp.Replace(" m3", "m3");
+                        }
+                        while ((tr = tmp.IndexOf(" M3")) != -1)
+                        {
+                            tmp = tmp.Replace(" M3", "M3");
+                        }
+                        while ((tr = tmp.IndexOf(" mm")) != -1)
+                        {
+                            tmp = tmp.Replace(" mm", "mm");
+                        }
+                        while ((tr = tmp.IndexOf(" MM")) != -1)
+                        {
+                            tmp = tmp.Replace(" MM", "MM");
+                        }
+                        foreach (var c in new string[] { "мм", "ММ", "mm", "MM", "m3", "M3", "м3", "М3", "*" })
+                        {
+                            int k = 0;
+                            while ((k = tmp.IndexOf(c, k + c.Length)) != -1)
+                            {
+                                StringBuilder tmpsb = new StringBuilder(tmp);
+                                int i = k - 1;
+                                while (i > 0 && char.IsDigit(tmp[i])) i--;
+                                if (tmp[i] == ' ')
+                                {
+                                    tmpsb[i] = '-';
+                                }
+                                i = k + 1;
+                                while (i > 0 && char.IsDigit(tmp[i])) i++;
+                                if (tmp[i] == ' ')
+                                {
+                                    tmpsb[i] = '-';
+                                }
+                                tmp = tmpsb.ToString();
+                            }
+                        }
+                        List<string> strs = tmp.Split(seps, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim().Trim(',').Trim()).Where(x => !String.IsNullOrEmpty(x)).ToList();
+
+                        bool sz = false, srt = false, w = false, v = false, mrk = false;
+                        string[] add_sort = new string[] { "1/2", "1/1", "1/3", "2/1" };
+                        string sort = "";
+                        string adding_sort = "";
+
+                        foreach (string str in strs)
+                        {
+                            if (str.ToLower().Contains("шт")) continue;
+                            if (str.ToLower().Contains("л")) continue;
+                            if (str.ToLower().Contains("п")) continue;
+                            if (str.ToLower().Contains("№")) continue;
+                            if (sz && srt && w && v && mrk)
+                            {
+                                toex.Add((string[])toex.Last().Clone());
+                                v = false;
+                                if (srt)
+                                    toex.Last()[0] = sort;
+                            }
+                            string low = str.ToLower();
+                            if (add_sort.Contains(str))
+                            {
+                                adding_sort = str;
+                                v = false;
+                                continue;
+                            }
+                            if (low.Contains("int") || low.Contains("ext"))
+                            {
+                                toex.Last()[1] = str;
+                                mrk = true;
+                            }
+                            if (low.Contains("м3") || low.Contains("m3")) //объем
+                            {
+                                toex.Last()[5] = get_numeric(str);
+                                v = true;
+                            }
+                            else if (low.Contains("m") || low.Contains("м")) //толщина
+                            {
+                                toex.Last()[4] = get_numeric(str);
+                                w = true;
+                                v = false;
+                            }
+                            else if (check_size_string(low)) //размер
+                                                             //else if (low.Contains("*") || low.Contains("x") || low.Contains("х")) //размер
+                            {
+                                var s = low.Split(separator_size).Select(x => x.Trim()).ToArray();
+                                toex.Last()[2] = get_numeric(s[0]);
+                                toex.Last()[3] = get_numeric(s[1]);
+                                sz = true;
+                                v = false;
+                            }
+                            else //sort
+                            {
+                                sort = str;
+                                if (adding_sort != "")
+                                    sort += " " + adding_sort;
+                                adding_sort = "";
+                                toex.Last()[0] = sort;
+                                srt = true;
+                                v = false;
+                            }
+                        }
+
+                        if (!v)
+                        {
+                            toex.Last()[5] = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.'); ;
+                        }
+
+                        for (int i = 0; i < toex.Count; ++i)
+                        {
+                            if (i != 0)
+                                dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                            dst.Cells[dst_row, 8].Value = toex[i][0];
+                            dst.Cells[dst_row, 9].Value = toex[i][1];
+                            dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                            dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                            dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                            dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                            if (i + 1 != toex.Count)
+                                dst_row++;
+                        }
+                    }
+                    else if (checkMaker(maker, "ООО \"ПФК - СЕРВИС\""))
                     {
                         var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                         temps.RemoveAt(0);
@@ -393,7 +563,7 @@ namespace ExcelParser
                             var ssize = string_size.Split(separator_size);
                             toex.Last().Add(ssize[0].Replace(',', '.'));
                             toex.Last().Add(ssize[1].Replace(',', '.'));
-                            toex.Last().Add(get_numeric(tmp, nonPars.IndexOf("ТОЛЩИНА")));
+                            toex.Last().Add(get_numeric(tmp, tmp.IndexOf("ТОЛЩИНА")));
 
                             string volume = get_value(tmp, "Кол-во");
                             volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
@@ -416,7 +586,8 @@ namespace ExcelParser
                                 dst_row++;
                         }
                     }
-                    else if (checkMaker(maker, "ООО \"ФАНПРОМ\"") || checkMaker(maker, "ООО \"АРДАТОВСКИЙ ФАНЕРНЫЙ ЗАВОД\""))
+                    else if (checkMaker(maker, "ООО \"ФАНПРОМ\"") ||
+                        checkMaker(maker, "ООО \"АРДАТОВСКИЙ ФАНЕРНЫЙ ЗАВОД\""))
                     {
                         var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
                         temps.RemoveAt(0);
@@ -474,7 +645,10 @@ namespace ExcelParser
                         List<string[]> toex = new List<string[]>();
                         toex.Add(new string[6]);
                         var tmp = get_value2(nonPars, "СОРТ");
-                        toex[0][0] = tmp.Substring(0, tmp.IndexOf(':'));
+                        int inddbldot = tmp.IndexOf(':'); ;
+                        if (inddbldot >= 0)
+                            toex[0][0] = tmp.Substring(0, tmp.IndexOf(':')).Trim();
+                        else toex[0][0] = tmp.Trim();
                         toex[0][1] = "ОТСУТСТВУЕТ";
                         foreach (var c in sep_sort)
                         {
@@ -573,7 +747,7 @@ namespace ExcelParser
                                 dst_row++;
                         }
                     }
-                    else if (checkMaker(maker, "НАО \"СВЕЗА НОВАТОР\""))
+                    else if (checkMaker(maker, "НАО \"СВЕЗА КОСТРОМА\""))
                     {
                         try
                         {
@@ -621,10 +795,62 @@ namespace ExcelParser
                         {
                             try
                             {
+                                string v = get_weight(nonPars);
+                                int i = nonPars.IndexOf("СТО");
+                                if (i == -1)
+                                    i = nonPars.IndexOf("CTO");
+                                if (i != -1)
+                                    throw new Exception("трудно");
+
+
+
+                                //коментил
+
+                                i += 3;
+
+                                while (i < nonPars.Length && nonPars[i] == ' ') i++;
+                                while (i < nonPars.Length && char.IsDigit(nonPars[i]) || nonPars[i] == '-') i++;
+                                while (i < nonPars.Length && nonPars[i] == ' ') i++;
+                                string srt = "";
+                                string mrk = "ОТСУТСТВУЕТ";
+                                int ind = nonPars.IndexOf("СОРТ");
+                                if (ind == -1)
+                                    ind = nonPars.IndexOf("COPT");
+                                srt = nonPars.Substring(ind + 4, nonPars.IndexOf("M3") - ind - 7);
+                                
+                                string w = get_numeric(srt);
+                                srt = srt.Substring(srt.IndexOf(w) + w.Length).Trim();
+                                string sz;
+                                string[] vsz;
+                                int l = nonPars.ToLower().IndexOf("размер");
+                                int r = nonPars.ToLower().IndexOf("мм");
+                                if (r == -1)
+                                    r = nonPars.ToLower().IndexOf("mm");
+                                if (r - l - 6 < 5)
+                                {
+                                    r = nonPars.ToLower().IndexOf("размер");
+                                    l = nonPars.ToLower().IndexOf("m3") + 2;
+                                    if (l == -1)
+                                        l = nonPars.ToLower().IndexOf("м3");
+                                }
+                                sz = nonPars.Substring(l, r - l - 1);
+                                vsz = sz.Split(separator_size, StringSplitOptions.RemoveEmptyEntries);
+                                dst.Cells[dst_row, 8].Value = srt;
+                                dst.Cells[dst_row, 9].Value = mrk.Trim();
+                                dst.Cells[dst_row, 10].Value2 = get_numeric(vsz[0]);
+                                dst.Cells[dst_row, 11].Value2 = get_numeric(vsz[1]);
+                                dst.Cells[dst_row, 12].Value2 = w;
+                                dst.Cells[dst_row, 13].Value2 = v;
+
+                            }
+                            catch (Exception ex)
+                            {
                                 var divs = nonPars.Split(new char[] { '_' }).Select(x => x.Trim()).ToList();
                                 if (char.IsDigit(divs[0].Last()))
                                     dst.Cells[dst_row, 9].Value = "ОТСУТСТВУЕТ";
                                 else dst.Cells[dst_row, 9].Value = divs[0].Substring(divs[0].LastIndexOf(' ')).Trim();
+
+                                nonPars = nonPars.Replace("СОРТ", "");
 
                                 var sorts = divs[1].Split(sep_sort.ToArray(), StringSplitOptions.RemoveEmptyEntries);
                                 var szw = divs[2].Split(izg_sep.ToArray(), StringSplitOptions.RemoveEmptyEntries);
@@ -650,14 +876,63 @@ namespace ExcelParser
                                         dst_row++;
                                 }
                             }
-                            catch (Exception ex)
+                        }
+                    }
+                    else if (checkMaker(maker, "НАО \"СВЕЗА НОВАТОР\""))
+                    {
+                        try
+                        {
+                            var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+                            temps.RemoveAt(0);
+
+                            List<List<string>> toex = new List<List<string>>();
+                            foreach (var tmp in temps)
                             {
-                                Logger.LogMessage(ex);
+                                toex.Add(new List<string>());
+                                string srt = get_value(tmp, "Сорт");
+                                if (srt == "ОТСУТСТВУЕТ")
+                                    throw new Exception("Нет сорта");
+                                toex.Last().Add(srt);
+                                toex.Last().Add(get_value(tmp, "Марка"));
+                                var string_size = get_value(tmp, "Размер");
+                                var ssize = string_size.Split(separator_size);
+                                toex.Last().Add(ssize[2].Replace(',', '.'));
+                                toex.Last().Add(ssize[1].Replace(',', '.'));
+                                toex.Last().Add(get_numeric(ssize[0]));
+
+                                string volume = get_value(tmp, "Кол-во");
+                                volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
+                                if (volume == "ОТСУТСТВУЕТ")
+                                    volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
+                                toex.Last().Add(volume);
+                            }
+
+                            for (int i = 0; i < toex.Count; ++i)
+                            {
+                                if (i != 0)
+                                    dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                dst.Cells[dst_row, 8].Value = toex[i][0];
+                                dst.Cells[dst_row, 9].Value = toex[i][1];
+                                dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                                dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                                dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                                dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                                if (i + 1 != toex.Count)
+                                    dst_row++;
+                            }
+
+                        }
+                        catch (Exception)
+                        {
+                            try
+                            {
                                 string v = get_weight(nonPars);
                                 int i = nonPars.IndexOf("СТО");
                                 if (i == -1)
                                     i = nonPars.IndexOf("CTO");
-                                i += 3;
+                                if (i != -1)
+                                    throw new Exception("трудно");
+                                /*i += 3;
 
                                 while (i < nonPars.Length && nonPars[i] == ' ') i++;
                                 while (i < nonPars.Length && char.IsDigit(nonPars[i]) || nonPars[i] == '-') i++;
@@ -667,22 +942,8 @@ namespace ExcelParser
                                 int ind = nonPars.IndexOf("СОРТ");
                                 if (ind == -1)
                                     ind = nonPars.IndexOf("COPT");
-                                if (i == ind) //сорт
-                                    srt = nonPars.Substring(i + 4, nonPars.IndexOf(v) - i - 5);
-                                else if (nonPars[i] == 'М' || nonPars[i] == 'M') //марка
-                                {
-                                    mrk = nonPars.Substring(i + 6, nonPars.IndexOf(' ', i + 6) - i - 6);
-                                    srt = nonPars.Substring(i + 6 + mrk.Length + 1, nonPars.IndexOf(v) - (i + 6 + mrk.Length + 1) - 1);
-                                }
-                                else if (ind != -1)
-                                {
-                                    mrk = nonPars.Substring(i, nonPars.IndexOf(' ', i) - i);
-                                    srt = nonPars.Substring(ind + 5, nonPars.IndexOf(v) - ind - 5);
-                                }
-                                else
-                                {
-                                    srt = nonPars.Substring(i, nonPars.IndexOf(v) - i);
-                                }
+                                srt = nonPars.Substring(ind + 4, nonPars.IndexOf("M3") - ind - 7);
+                                
                                 string w = get_numeric(srt);
                                 srt = srt.Substring(srt.IndexOf(w) + w.Length).Trim();
                                 string sz;
@@ -705,7 +966,41 @@ namespace ExcelParser
                                 dst.Cells[dst_row, 10].Value2 = get_numeric(vsz[0]);
                                 dst.Cells[dst_row, 11].Value2 = get_numeric(vsz[1]);
                                 dst.Cells[dst_row, 12].Value2 = w;
-                                dst.Cells[dst_row, 13].Value2 = v;
+                                dst.Cells[dst_row, 13].Value2 = v;*/
+
+                            }
+                            catch (Exception ex)
+                            {
+                                var divs = nonPars.Split(new char[] { '_' }).Select(x => x.Trim()).ToList();
+                                if (char.IsDigit(divs[0].Last()))
+                                    dst.Cells[dst_row, 9].Value = "ОТСУТСТВУЕТ";
+                                else dst.Cells[dst_row, 9].Value = divs[0].Substring(divs[0].LastIndexOf(' ')).Trim();
+
+                                nonPars = nonPars.Replace("СОРТ", "");
+
+                                var sorts = divs[1].Split(sep_sort.ToArray(), StringSplitOptions.RemoveEmptyEntries);
+                                var szw = divs[2].Split(izg_sep.ToArray(), StringSplitOptions.RemoveEmptyEntries);
+                                for (int i = 0; i < sorts.Length; ++i)
+                                {
+                                    if (i != 0)
+                                        dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                                    string w = get_numeric(sorts[i]);
+                                    dst.Cells[dst_row, 10].Value2 = w;
+                                    dst.Cells[dst_row, 8].Value = sorts[i].Substring(w.Length);
+
+                                    string sz_str = get_value(szw[i], "Размер");
+                                    string dl = get_numeric(sz_str);
+                                    dst.Cells[dst_row, 11].Value2 = dl;
+                                    dst.Cells[dst_row, 12].Value2 = get_numeric(sz_str, dl.Length);
+
+                                    string volume = get_value(szw[i], "Кол-во");
+                                    volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
+                                    if (volume == "ОТСУТСТВУЕТ")
+                                        volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
+                                    dst.Cells[dst_row, 13].Value2 = volume;
+                                    if (i + 1 != sorts.Length)
+                                        dst_row++;
+                                }
                             }
                         }
                     }
@@ -841,224 +1136,160 @@ namespace ExcelParser
                                 dst_row++;
                         }
                     }
-                    else if (checkMaker(maker, "ООО \"ПЛАЙКОМ - ИЖОРА\"") ||
-                               checkMaker(maker, "ООО \"ФАНПРОМ\" , ООО \"ПЛАЙВУД\"") ||
-                               checkMaker(maker, "СВЕЗА УРАЛЬСКИЙ") ||
-                               checkMaker(maker, "НАО СВЕЗА ВЕРХНЯЯ СИНЯЧИХА") ||
-                               checkMaker(maker, "НАО \"СВЕЗА МАНТУРОВО\"") ||
-                               checkMaker(maker, "ООО \"УФК\"") ||
-                               checkMaker(maker, "АО \"ЧФМК\"") ||
-                               checkMaker(maker, "ООО<САНГИРА +>") ||
-                               checkMaker(maker, "НАО \"СВЕЗА УСТЬ - ИЖОРА\"") ||
-                               checkMaker(maker, "ООО \"БАЛТИКА ЛЕСПРОМ\"") ||
-                               checkMaker(maker, "ООО \"ТАВДИНСКИЙ ФПК\"") ||
-                               checkMaker(maker, "ООО \"ТФПК\"") ||
-                               checkMaker(maker, "ЗАО \"МУРОМ\"") ||
-                               checkMaker(maker, "ООО \"ОРИОН\"") ||
-                               checkMaker(maker, "ООО \"САТИССКИЕ ПРОСТОРЫ\"") ||
-                               checkMaker(maker, "ЗАО ФАНЕРНЫЙ ЗАВОД \"ВЛАСТЬ ТРУДА\"") ||
-                               checkMaker(maker, "ООО \"ПРИВОЛЖСКАЯ ЛЕСОПЕРЕРАБАТЫВАЮЩАЯ КОМПАНИЯ\"") ||
-                               checkMaker(maker, "ООО БРЯНСКИЙ ФАНЕРНЫЙ КОМБИНАТ") ||
-                               checkMaker(maker, "ООО ФАНЕРНЫЙ КОМБИНАТ \"НОРДПЛИТ\"") ||
-                               checkMaker(maker, "ООО ФК \"НОРДПЛИТ\"") ||
-                               checkMaker(maker, "ООО ПФ \"ИНЗЕНСКИЙ ДОЗ\"")
-                          )
+                    else if (checkMaker(maker, "OOО\"СВЕЗА УРАЛЬСКИЙ\"") ||
+                        checkMaker(maker, "ЗАО\"ПЛАЙТЕРРА\"") ||
+                        checkMaker(maker, "АО ЧФМК") ||
+                        checkMaker(maker, "ТЮМЕНСКИЙ ФАНЕРНЫЙ ЗАВОД") ||
+                        checkMaker(maker, "ООО ДФК") ||
+                        checkMaker(maker, "ООО КФК") ||
+                        checkMaker(maker, "ВЯТСКИЙ ФАНЕРНЫЙ КОМБИНАТ") ||
+                        checkMaker(maker, "ООО ФАНДЕРА") ||
+                        checkMaker(maker, "ООО ПЛАЙТВУД"))
                     {
-                        throw new Exception("НЕ ПРИДУМАЛ");
+                        var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+                        temps.RemoveAt(0);
+
+                        List<List<string>> toex = new List<List<string>>();
+                        foreach (var tmp in temps)
+                        {
+                            toex.Add(new List<string>());
+                            toex.Last().Add(get_value(tmp, "Сорт"));
+                            toex.Last().Add(get_value(tmp, "Марка"));
+                            var string_size = get_value(tmp, "Размер");
+                            if (string_size != "ОТСУТСТВУЕТ")
+                            {
+                                if (string_size.IndexOf(' ') != -1)
+                                    string_size = string_size.Substring(0, string_size.IndexOf(' '));
+                                while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
+                                    string_size = string_size.Remove(string_size.Length - 1);
+                            }
+                            var ssize = string_size.Split(separator_size);
+                            toex.Last().Add(ssize[0].Replace(',', '.'));
+                            toex.Last().Add(ssize[1].Replace(',', '.'));
+                            toex.Last().Add(get_numeric(ssize[2]));
+
+                            string volume = get_value(tmp, "Кол-во");
+                            volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
+                            if (volume == "ОТСУТСТВУЕТ")
+                                volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
+                            toex.Last().Add(volume);
+                        }
+                        for (int i = 0; i < toex.Count; ++i)
+                        {
+                            if (i != 0)
+                                dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                            dst.Cells[dst_row, 8].Value = toex[i][0];
+                            dst.Cells[dst_row, 9].Value = toex[i][1];
+                            dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                            dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                            dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                            dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                            if (i + 1 != toex.Count)
+                                dst_row++;
+                        }
+                    }
+                    //---------------------------------------------
+                    else if (checkMaker(maker, "ООО\"ЮПМ - КЮММЕНЕ ЧУДОВО\"") ||
+                        checkMaker(maker, "ООО ЖЛПК") ||
+                        checkMaker(maker, "ЗАО МУРОМ") ||
+                        checkMaker(maker, "ЗАО АРХАНГЕЛЬСКИЙ ФАНЕРНЫЙ ЗАВОД"))
+                    {
+                        var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+                        temps.RemoveAt(0);
+
+                        List<List<string>> toex = new List<List<string>>();
+                        foreach (var tmp in temps)
+                        {
+                            toex.Add(new List<string>());
+                            toex.Last().Add(get_value(tmp, "Сорт"));
+                            toex.Last().Add(get_value(tmp, "Марка"));
+                            var string_size = get_value(tmp, "Размер");
+                            if (string_size != "ОТСУТСТВУЕТ")
+                            {
+                                if (string_size.IndexOf(' ') != -1)
+                                    string_size = string_size.Substring(0, string_size.IndexOf(' '));
+                                while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
+                                    string_size = string_size.Remove(string_size.Length - 1);
+                            }
+                            var ssize = string_size.Split(separator_size);
+                            toex.Last().Add(ssize[2].Replace(',', '.'));
+                            toex.Last().Add(ssize[1].Replace(',', '.'));
+                            toex.Last().Add(get_numeric(ssize[0]));
+
+                            string volume = get_value(tmp, "Кол-во");
+                            volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
+                            if (volume == "ОТСУТСТВУЕТ")
+                                volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
+                            toex.Last().Add(volume);
+                        }
+                        for (int i = 0; i < toex.Count; ++i)
+                        {
+                            if (i != 0)
+                                dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                            dst.Cells[dst_row, 8].Value = toex[i][0];
+                            dst.Cells[dst_row, 9].Value = toex[i][1];
+                            dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                            dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                            dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                            dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                            if (i + 1 != toex.Count)
+                                dst_row++;
+                        }
+                    }
+                    else if (checkMaker(maker, "НАО\"СВЕЗА МАНТУРОВО\""))
+                    {
+                        nonPars = nonPars.Substring(nonPars.IndexOf(":"));
+                        var tmp2 = nonPars.Split(new string[] { "_1.1" }, StringSplitOptions.RemoveEmptyEntries);
+                        var types = tmp2[0].Split(new string[] { ":" }, StringSplitOptions.RemoveEmptyEntries);
+
+                        var temps = tmp2[1].Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+                        temps.RemoveAt(0);
+
+                        List<List<string>> toex = new List<List<string>>();
+                        for (int i = 0; i < temps.Count; ++i)
+                        {
+                            string tp = types[2 * i].ToLower().Replace(" ", "");
+                            string sz = types[2 * i + 1].ToLower().Replace(" ", "");
+                            toex.Add(new List<string>());
+                            toex.Last().Add(get_value(temps[i], "Сорт").Replace(",", "").Replace("NS", ""));
+                            string mrk = "";
+                            if (tp.IndexOf("int") != -1)
+                                mrk += (mrk.Length > 0 ? " " : "") + "INT";
+                            if (tp.IndexOf("ext") != -1)
+                                mrk += (mrk.Length > 0 ? " " : "") + "EXT";
+                            if (tp.IndexOf("(фк)") != -1)
+                                mrk += (mrk.Length > 0 ? " " : "") + "(ФК)";
+                            if (tp.IndexOf("(фсф)") != -1)
+                                mrk += (mrk.Length > 0 ? " " : "") + "(ФСФ)";
+                            if (tp.IndexOf("ns") != -1)
+                                mrk += (mrk.Length > 0 ? " " : "") + "NS";
+                            toex.Last().Add(mrk);
+                            var lng = get_numeric(sz);
+                            var width = get_numeric(sz, sz.IndexOf(lng) + lng.Length);
+                            var thickness = get_numeric(sz, sz.IndexOf(width) + width.Length);
+                            toex.Last().Add(lng);
+                            toex.Last().Add(width);
+                            toex.Last().Add(thickness);
+                            toex.Last().Add(get_weight(sz));
+
+                        }
+                        for (int i = 0; i < toex.Count; ++i)
+                        {
+                            if (i != 0)
+                                dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
+                            dst.Cells[dst_row, 8].Value = toex[i][0];
+                            dst.Cells[dst_row, 9].Value = toex[i][1];
+                            dst.Cells[dst_row, 10].Value2 = toex[i][2];
+                            dst.Cells[dst_row, 11].Value2 = toex[i][3];
+                            dst.Cells[dst_row, 12].Value2 = toex[i][4];
+                            dst.Cells[dst_row, 13].Value2 = toex[i][5];
+                            if (i + 1 != toex.Count)
+                                dst_row++;
+                        }
                     }
                     else
                     {
-
-                        try
-                        {
-                            var temps = nonPars.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
-                            temps.RemoveAt(0);
-
-                            List<List<string>> toex = new List<List<string>>();
-                            foreach (var tmp in temps)
-                            {
-                                toex.Add(new List<string>());
-                                toex.Last().Add(get_value(tmp, "Сорт"));
-                                toex.Last().Add(get_value(tmp, "Марка"));
-                                var string_size = get_value(tmp, "Размер");
-                                if (string_size != "ОТСУТСТВУЕТ")
-                                {
-                                    if (string_size.IndexOf(' ') != -1)
-                                        string_size = string_size.Substring(0, string_size.IndexOf(' '));
-                                    while (string_size.Length > 0 && !char.IsDigit(string_size.Last()))
-                                        string_size = string_size.Remove(string_size.Length - 1);
-                                }
-                                var ssize = string_size.Split(separator_size);
-                                toex.Last().Add(ssize[0].Replace(',', '.'));
-                                toex.Last().Add(ssize[1].Replace(',', '.'));
-                                toex.Last().Add(get_numeric(ssize[2]));
-
-                                string volume = get_value(tmp, "Кол-во");
-                                volume = volume.Substring(0, volume.LastIndexOf(' ')).Replace(',', '.');
-                                if (volume == "ОТСУТСТВУЕТ")
-                                    volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                toex.Last().Add(volume);
-                            }
-
-                            for (int i = 0; i < toex.Count; ++i)
-                            {
-                                if (i != 0)
-                                    dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                dst.Cells[dst_row, 8].Value = toex[i][0];
-                                dst.Cells[dst_row, 9].Value = toex[i][1];
-                                dst.Cells[dst_row, 10].Value2 = toex[i][2];
-                                dst.Cells[dst_row, 11].Value2 = toex[i][3];
-                                dst.Cells[dst_row, 12].Value2 = toex[i][4];
-                                dst.Cells[dst_row, 13].Value2 = toex[i][5];
-                                if (i + 1 != toex.Count)
-                                    dst_row++;
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            /*
-                             * ДЕТАЛЬ МЕБЕЛЬНАЯ ИЗ КЛЕЕНОЙ БЕРЕЗОВОЙ ФАНЕРЫ СОРТ А/В, 9-ТИ СЛОЙНАЯ ТОЛЩИНОЙ 10ММ:700Х50Х10ММ-29,400М3(84000ШТ)._
-                             * [=1=] :_[=1.1=]  Изготовитель: ОООТЕХНОФЛЕКС; Тов.знак: ОТСУТСТВУЕТ;
-                            */
-                            try
-                            {
-                                dst.Cells[dst_row, 8].Value2 = get_value2(nonPars, "СОРТ");
-                                dst.Cells[dst_row, 9].Value = "ОТСУТСТВУЕТ";
-                                var ssize = get_size_string(nonPars).Split(separator_size);
-                                dst.Cells[dst_row, 10].Value2 = ssize[0].Replace(',', '.');
-                                dst.Cells[dst_row, 11].Value2 = ssize[1].Replace(',', '.');
-                                dst.Cells[dst_row, 12].Value2 = ssize[2].Replace(',', '.');
-                                string volume = get_weight(nonPars);
-                                if (volume == "ОТСУТСТВУЕТ")
-                                    volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                dst.Cells[dst_row, 13].Value2 = volume;
-                            }
-                            catch (Exception)
-                            {
-                                try
-                                {
-                                    /*
-                                     * 1-ФАНЕРА КЛЕЕНАЯ, СОСТОЯЩАЯ ИСКЛЮЧИТЕЛЬНО ИЗ БЕРЕЗОВОГО ШПОНА МАРКИ ФК, ГОСТ 3916.1-96, РАЗМЕР 1525Х1525ММ, 
-                                     * НЕШЛИФОВАННАЯ,СОРТ 4/4, КЛАС ЭМИССИИ Е-1, КРОМКИ И ТОРЦЫ НЕ ИМЕЮТ ПАЗОВ И ГРЕБНЕЙ,: ТОЛЩИНА- 6ММ, 32 ПАКЕТА-32.15КУБ.М, 
-                                     * КОЛИЧЕСТВО СЛОЕВ-5, ТО_[=1=] ЛЩИНА КАЖДОГО СЛОЯ 1,2ММ, СПЕЦИФИКАЦИЯ №56,ЦЕНА 6ММ- 230 ЕВРО ДЛЯ СТРОИТЕЛЬНЫХ РАБОТ:_[=1.1=]  
-                                     * Изготовитель: ПК МАКСАТИХИНСКИЙ ЛЕСОПРОМЫШЛЕННЫЙ КОМБИНАТ; Тов.знак: ОТСУТСТВУЕТ;
-                                    */
-                                    dst.Cells[dst_row, 8].Value2 = get_value2(nonPars, "СОРТ");
-                                    dst.Cells[dst_row, 9].Value = get_value2(nonPars, "МАРКИ");
-                                    int r = nonPars.IndexOf("РАЗМЕР");
-                                    string a = get_numeric(nonPars, r);
-                                    dst.Cells[dst_row, 10].Value2 = a;
-                                    r += a.Length;
-                                    dst.Cells[dst_row, 11].Value2 = get_numeric(nonPars, r);
-                                    dst.Cells[dst_row, 12].Value2 = get_numeric(nonPars, nonPars.IndexOf("ТОЛЩИНА"));
-                                    string volume = get_numeric(nonPars, nonPars.IndexOf("ПАКЕТА"));
-                                    if (volume == "ОТСУТСТВУЕТ")
-                                        volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                    dst.Cells[dst_row, 13].Value2 = volume;
-                                }
-                                catch (Exception)
-                                {
-                                    try
-                                    {
-                                        /*
-                                        1 - ФАНЕРА КЛЕЕНАЯ, СОСТОЯЩАЯ ИСКЛЮЧИТЕЛЬНО ИЗ БЕРЕЗОВОГО ШПОНА МАРКИ ФК, ГОСТ 3916.1 - 96, РАЗМЕР 1525Х1525ММ, 
-                                        НЕШЛИФОВАННАЯ,СОРТ 4 / 4, КЛАС ЭМИССИИ Е - 1, КРОМКИ И ТОРЦЫ НЕ ИМЕЮТ ПАЗОВ И ГРЕБНЕЙ,: ТОЛЩИНА - 9ММ, 
-                                        17ПАКЕТОВ - 17,08КУБ.М, КОЛИЧЕСТВО СЛОЕВ-7, ТОЛЩИНА - 15 ММ, 16 ПАКЕТОВ - 15,94 КУБ.М, КОЛИЧЕСТВО СЛОЕВ-11, 
-                                        ТОЛЩИНА КАЖДОГО СЛОЯ 1,33ММ, СПЕЦИФИКАЦИЯ № 10, ЦЕНА 9ММ - 214ЕВРО,ЦЕНА 15 ММ - 207ЕВРО, ДЛЯ СТРОИТЕЛЬНЫХ РАБОТ: 
-                                        Изготовитель: ПК МАКСАТИХИНСКИЙ ЛЕСОПРОМЫШЛЕННЫЙ КОМБИНАТ; Тов.знак: ОТСУТСТВУЕТ;
-                                        */
-                                        if (nonPars.IndexOf("СОРТ") == -1 ||
-                                            nonPars.IndexOf("МАРКИ") == -1 ||
-                                            nonPars.IndexOf("РАЗМЕР") == -1 ||
-                                            nonPars.IndexOf("ТОЛЩИНА - ") == -1 ||
-                                            nonPars.IndexOf("ПАКЕТОВ") == -1)
-                                            throw new Exception("Не соответствие шаблону");
-                                        dst.Cells[dst_row, 8].Value = get_value2(nonPars, "СОРТ");
-                                        dst.Cells[dst_row, 9].Value = get_value2(nonPars, "МАРКИ");
-                                        int r = nonPars.IndexOf("РАЗМЕР");
-                                        string a = get_numeric(nonPars, r);
-                                        dst.Cells[dst_row, 10].Value2 = a;
-                                        r += a.Length;
-                                        dst_row--;
-                                        dst.Cells[dst_row, 11].Value2 = get_numeric(nonPars, r);
-                                        bool bfirst = true;
-
-                                        var temps = nonPars.Split(new string[] { "ТОЛЩИНА - " }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                                        temps.RemoveAt(0);
-                                        foreach (var tmp in temps)
-                                        {
-                                            dst_row++;
-
-                                            if (!bfirst)
-                                                dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-                                            dst.Cells[dst_row, 12].Value2 = get_numeric(tmp, 0);
-                                            string volume = get_numeric(tmp, nonPars.IndexOf("ПАКЕТОВ"));
-                                            if (volume == "ОТСУТСТВУЕТ")
-                                                volume = src.Cells[src_row, GetColumnNumber(src, "G31_7")].Value2.Replace(',', '.');
-                                            dst.Cells[dst_row, 13].Value2 = volume;
-                                            bfirst = false;
-                                        }
-                                    }
-                                    catch (Exception)
-                                    {
-                                        //!!!!! НЕПРАВИЛЬНО
-                                        /*
-                                         * ФАHЕРА КЛЕЕНАЯ БЕРЕЗОВАЯ (С ТОЛЩИНОЙ ШПОНА НЕ БОЛЕЕ 2,5ММ, НАРУЖН.СЛОИ ИЗ ЛИСТОВ БЕРЕЗ.ШПОНА) 
-                                         * ВВ 1250*2500
-                                         *  (
-                                         *      6,5ММ-2,966М3;
-                                         *      9ММ-6,076М3;
-                                         *      12ММ-15М3;
-                                         *      15ММ-27М3;
-                                         *      18ММ-12,152М3;
-                                         *      21ММ-13,581М3;
-                                         *      24ММ-3М3;
-                                         *      27ММ-3,038М3;
-                                         *      30ММ-6М3
-                                         *  ).: 
-                                         *  Изготовитель: ООО СЫКТЫВКАРСКИЙ ФАНЕРНЫЙ ЗАВОД; 
-                                         *  Тов.знак: SYPLY; 
-                                         *  Марка :ФСФ; 
-                                         *  Модель: ОТСУТСТВУЕТ; 
-                                         *  Артикул: ОТСУТСТВУЕТ; 
-                                         *  Стандарт: ТУ5512-001-44769167-11; 
-                                         *  Кол-во: 88,813 М3
-                                        */
-                                        dst.Cells[dst_row, 9].Value = get_value(nonPars, "Марка");
-                                        int ttl = nonPars.IndexOf(')') + 1;
-                                        int ttr = ttl;
-                                        while (!char.IsDigit(nonPars[ttr]))
-                                            ttr++;
-                                        dst.Cells[dst_row, 8].Value = nonPars.Substring(ttl, ttr - ttl - 1);
-
-                                        string a = get_numeric(nonPars, ttr);
-                                        dst.Cells[dst_row, 10].Value2 = a;
-                                        ttr += a.Length;
-                                        a = get_numeric(nonPars, ttr);
-                                        dst.Cells[dst_row, 11].Value2 = a;
-
-                                        var tmppars = nonPars.Substring(nonPars.IndexOf('(', ttl) + 1);
-                                        tmppars = tmppars.Remove(tmppars.IndexOf(')'));
-                                        var temps = tmppars.Split(new char[] { ';' }).ToList();
-                                        dst_row--;
-                                        bool bfirst = true;
-                                        foreach (var tmp in temps)
-                                        {
-                                            dst_row++;
-
-                                            if (!bfirst)
-                                                dst.Cells[dst_row - 1, 1].EntireRow.Copy(dst.Cells[dst_row, 1].EntireRow);
-
-                                            var b = get_numeric(tmp, 0);
-                                            dst.Cells[dst_row, 12].Value2 = b;
-                                            dst.Cells[dst_row, 13].Value2 = get_numeric(tmp, b.Length);
-                                            bfirst = false;
-                                        }
-
-                                    }
-                                }
-                            }
-                        }
+                        throw new Exception("НЕ ПРИДУМАЛ");
                     }
 
                     dst_row++;
@@ -1224,6 +1455,10 @@ namespace ExcelParser
             int r = src.ToLower().IndexOf("м3");
             if (r == -1)
                 r = src.ToLower().IndexOf("m3");
+            if (r == -1)
+                r = src.ToLower().IndexOf("куб.м");
+            if (r == -1)
+                r = src.ToLower().IndexOf("куб. м");
             if (r == -1)
                 return "ОТСУТСТВУЕТ";
             r--;
